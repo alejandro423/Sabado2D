@@ -30,6 +30,7 @@ namespace PlatformerTools
             Sprite groundSprite = LoadSprite("ground");
             Sprite wallSprite = LoadSprite("wall");
             Sprite coinSprite = LoadSprite("coin");
+            Sprite goalSprite = LoadSprite("goal");
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "Platformer";
@@ -67,6 +68,7 @@ namespace PlatformerTools
             MakeCoin("Coin A", level, coinSprite, new Vector2(-1f, -1.1f));
             MakeCoin("Coin B", level, coinSprite, new Vector2(6f, 0.65f));
             MakeCoin("Coin C", level, coinSprite, new Vector2(11.5f, 2.15f));
+            MakeGoal("Goal", level, goalSprite, new Vector2(17.5f, -2.25f));
 
             // HUD
             Canvas hud = new GameObject("HUD").AddComponent<Canvas>();
@@ -91,8 +93,25 @@ namespace PlatformerTools
             scoreRect.anchoredPosition = new Vector2(40f, -30f);
             scoreRect.sizeDelta = new Vector2(500f, 80f);
 
+            GameObject winObject = new GameObject("Win Text");
+            winObject.transform.SetParent(hud.transform, false);
+            Text winText = winObject.AddComponent<Text>();
+            winText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            winText.fontSize = 64;
+            winText.color = new Color(1f, 0.9f, 0.35f);
+            winText.alignment = TextAnchor.MiddleCenter;
+            winText.text = string.Empty;
+            RectTransform winRect = winObject.GetComponent<RectTransform>();
+            winRect.anchorMin = new Vector2(0.5f, 0.5f);
+            winRect.anchorMax = new Vector2(0.5f, 0.5f);
+            winRect.pivot = new Vector2(0.5f, 0.5f);
+            winRect.anchoredPosition = Vector2.zero;
+            winRect.sizeDelta = new Vector2(1200f, 300f);
+            winObject.SetActive(false);
+
             Platformer.GameManager manager = new GameObject("Game Manager").AddComponent<Platformer.GameManager>();
             manager.ScoreText = scoreText;
+            manager.WinText = winText;
 
             // Player body; movement arrives in the player-controller step.
             GameObject player = new GameObject("Player");
@@ -246,12 +265,52 @@ namespace PlatformerTools
                 problems.Add("missing HUD canvas");
             }
 
+            Platformer.Goal goal = Object.FindAnyObjectByType<Platformer.Goal>();
+            if (goal == null)
+            {
+                problems.Add("missing Goal");
+            }
+            else
+            {
+                Collider2D goalTrigger = goal.GetComponent<Collider2D>();
+                if (goalTrigger == null || !goalTrigger.isTrigger)
+                {
+                    problems.Add("goal has no trigger collider");
+                }
+            }
+
+            if (manager != null)
+            {
+                if (manager.WinText == null)
+                {
+                    problems.Add("GameManager has no win text");
+                }
+                else if (manager.WinText.gameObject.activeSelf)
+                {
+                    problems.Add("win text should start hidden");
+                }
+            }
+
             if (problems.Count > 0)
             {
                 throw new System.Exception("scene verification failed: " + string.Join("; ", problems));
             }
 
             return string.Format("scene ok: {0} roots, {1} box colliders, build settings enabled", scene.GetRootGameObjects().Length, colliders);
+        }
+
+        private static void MakeGoal(string name, Transform parent, Sprite sprite, Vector2 position)
+        {
+            GameObject goal = new GameObject(name);
+            goal.transform.SetParent(parent, false);
+            goal.transform.position = position;
+            SpriteRenderer renderer = goal.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.sortingOrder = 3;
+            BoxCollider2D trigger = goal.AddComponent<BoxCollider2D>();
+            trigger.size = new Vector2(1f, 1.5f);
+            trigger.isTrigger = true;
+            goal.AddComponent<Platformer.Goal>();
         }
 
         private static void MakeCoin(string name, Transform parent, Sprite sprite, Vector2 position)
