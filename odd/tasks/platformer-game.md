@@ -19,9 +19,9 @@ Unity 6000.6.2f1 (URP 2D, Input System package active). Verification: editor com
 | --- | --- | --- | --- |
 | T1 | S6 | inline | done (PR #1) |
 | T2 | S1, S3, S7 | inline | done (PR #2 sprites, #3 camara, #4 escena) |
-| T3 | S2 | inline | pending |
-| T4 | S4 | inline | pending |
-| T5 | S5 | inline | pending |
+| T3 | S2 | inline | done (PR #6) |
+| T4 | S4 | inline | done (PR #7) |
+| T5 | S5 | inline | done (PR #8) |
 
 ## Log
 
@@ -31,7 +31,10 @@ Unity 6000.6.2f1 (URP 2D, Input System package active). Verification: editor com
 
 ### Delivery rule (user preference)
 
-The user names every commit: give a short explanation of the change, then wait for their message before committing.
+- One pull request per small group of related changes, even when it is a few lines.
+- Branch names: `mijael_` + the group in Spanish (`mijael_arte`, `mijael_camara`, `mijael_jugador`, ...). The agent picks the group name.
+- Commit messages: basic and in Spanish ("agregue monedas y puntaje").
+- Merge with a merge commit, then delete the branch.
 
 ### L2 — T1 project sync
 
@@ -49,3 +52,24 @@ The user names every commit: give a short explanation of the change, then wait f
 - Repo `alejandro423/Sabado2D`, branch `main`, unprotected, GitHub API reachable with the cached git credential; `gh` is not installed so the REST API is used.
 - Unity console baseline: 0 errors (one unrelated `Unity.AI.Toolkit` account warning).
 - Working tree had uncommitted package/project-settings changes; T1 commits them so later PRs stay scoped.
+
+### L4 — T3 player controller (PR #6)
+
+- `PlayerController` owns physics and `KeyboardInput` reads the keyboard, so the controller can be driven from tests.
+- Play Mode test: moved 1.97 units right, jumped 0.46 units.
+
+### L5 — T4 coins and score (PR #7)
+
+- `Coin` triggers on the player and asks `GameManager` to add score; HUD uses a legacy `Text` with `LegacyRuntime.ttf`.
+- Play Mode test: score 0 -> 1, coins 3 -> 2, HUD "Monedas: 1".
+
+### L6 — T5 goal and restart (PR #8)
+
+- `Goal` trigger wins the run; `GameManager` shows the win text and reloads the scene on `R`.
+- Play Mode test: win text shown, restart returns to score 0 without win.
+
+### L7 — Tooling notes
+
+- Unity can be driven without the MCP RunCommand tool through `unity command script run --file <file> --entry <Type.Method>`; scripts live in `odd/scripts/` so they stay outside `Assets/` and trigger no domain reload.
+- `unity command editor set_auto_tick --enabled true` is required to keep the editor ticking while unfocused.
+- `script eval --file` runs inside Play Mode, which is how the gameplay checks were executed.
