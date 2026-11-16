@@ -1,0 +1,261 @@
+using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
+
+// Pon este script en un GameObject vacío y dale Play. Construye todo solo.
+public class EscenaBolita : MonoBehaviour
+{
+    [Header("Tamaño de la sala")]
+    public float ancho = 20f;
+    public float alto = 9f;
+    public float profundidad = 3f;
+
+    [Header("Bola")]
+    public float radio = 0.5f;
+    public float fuerzaMovimiento = 25f;
+    public float velocidadMaxima = 7f;
+    public float fuerzaSalto = 8f;
+    [Range(0f, 1f)] public float rebote = 0.7f;
+    [Tooltip("Si está activo, W/S mueven la bola hacia adentro/afuera de la pantalla")]
+    public bool moverEnProfundidad = true;
+
+    Material matRojo, matBlanco;
+
+    void Start()
+    {
+        matRojo = NuevoMaterial(new Color(0.53f, 0f, 0.08f));
+        matBlanco = NuevoMaterial(Color.white);
+
+        ConstruirSala();
+        ConstruirPlataformas();
+        CrearBola();
+        ConfigurarCamara();
+
+        if (FindFirstObjectByType<Light>() == null)
+        {
+            var luz = new GameObject("Luz");
+            var l = luz.AddComponent<Light>();
+            l.type = LightType.Directional;
+            luz.transform.rotation = Quaternion.Euler(40f, -20f, 0f);
+        }
+    }
+
+    // ---------- Sala ----------
+    void ConstruirSala()
+    {
+        float hw = ancho / 2f;
+        float hd = profundidad / 2f;
+
+        Bloque("Piso", new Vector3(0, -0.5f, 0), new Vector3(ancho + 2, 1, profundidad), matRojo);
+        Bloque("Techo", new Vector3(0, alto + 0.5f, 0), new Vector3(ancho + 2, 1, profundidad), matRojo);
+        Bloque("Pared Izq", new Vector3(-hw - 0.5f, alto / 2f, 0), new Vector3(1, alto + 2, profundidad), matRojo);
+        Bloque("Pared Der", new Vector3(hw + 0.5f, alto / 2f, 0), new Vector3(1, alto + 2, profundidad), matRojo);
+
+        // Fondo blanco
+        Bloque("Fondo", new Vector3(0, alto / 2f, hd + 0.5f), new Vector3(ancho + 2, alto + 2, 1), matBlanco);
+        // Pared frontal invisible (para que la bola no se salga hacia la cámara)
+        Bloque("Pared Frontal", new Vector3(0, alto / 2f, -hd - 0.5f), new Vector3(ancho + 2, alto + 2, 1), matBlanco, false);
+    }
+
+    void ConstruirPlataformas()
+    {
+        // (x, y, largo)
+        float[,] p =
+        {
+            { -5.5f, 1.8f, 3.0f },
+            { -1.5f, 3.3f, 3.0f },
+            {  3.0f, 2.2f, 3.5f },
+            {  6.5f, 4.2f, 3.0f },
+            {  0.5f, 5.4f, 3.5f },
+            { -6.0f, 5.0f, 3.0f },
+        };
+
+        for (int i = 0; i < p.GetLength(0); i++)
+        {
+            Bloque("Plataforma " + (i + 1),
+                new Vector3(p[i, 0], p[i, 1], 0),
+                new Vector3(p[i, 2], 0.4f, profundidad),
+                matRojo);
+        }
+    }
+
+    GameObject Bloque(string nombre, Vector3 pos, Vector3 escala, Material mat, bool visible = true)
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        go.name = nombre;
+        go.transform.SetParent(transform);
+        go.transform.position = pos;
+        go.transform.localScale = escala;
+        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        go.GetComponent<MeshRenderer>().enabled = visible;
+        return go;
+    }
+
+    // ---------- Bola ----------
+    void CrearBola()
+    {
+        var bola = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        bola.name = "Bola";
+        bola.transform.position = new Vector3(-8f, radio + 0.1f, 0f);
+        bola.transform.localScale = Vector3.one * radio * 2f;
+
+        // Material con textura (no se ve plana)
+        var mat = NuevoMaterial(Color.white);
+        mat.mainTexture = CrearTexturaBola();
+        if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.55f);
+        if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", 0.55f);
+        bola.GetComponent<MeshRenderer>().sharedMaterial = mat;
+
+        // Física con rebote
+        var fis = new PhysicsMaterial("Rebote")
+        {
+            bounciness = rebote,
+            dynamicFriction = 0.6f,
+            staticFriction = 0.6f,
+            bounceCombine = PhysicsMaterialCombine.Maximum
+        };
+        bola.GetComponent<SphereCollider>().sharedMaterial = fis;
+
+        var rb = bola.AddComponent<Rigidbody>();
+        rb.mass = 1f;
+        rb.linearDamping = 0.2f;
+        rb.angularDamping = 0.3f;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        if (!moverEnProfundidad) rb.constraints = RigidbodyConstraints.FreezePositionZ;
+
+        var c = bola.AddComponent<ControlBola>();
+        c.fuerzaMovimiento = fuerzaMovimiento;
+        c.velocidadMaxima = velocidadMaxima;
+        c.fuerzaSalto = fuerzaSalto;
+        c.radio = radio;
+        c.moverEnProfundidad = moverEnProfundidad;
+    }
+
+    Texture2D CrearTexturaBola()
+    {
+        const int n = 256;
+        var tex = new Texture2D(n, n, TextureFormat.RGBA32, true);
+        tex.wrapMode = TextureWrapMode.Repeat;
+
+        Color gris = new Color(0.55f, 0.55f, 0.58f);
+        Color rojo = new Color(0.53f, 0f, 0.08f);
+
+        for (int y = 0; y < n; y++)
+        {
+            for (int x = 0; x < n; x++)
+            {
+                float u = x / (float)n;
+                float v = y / (float)n;
+
+                // Franjas diagonales + manchas de ruido
+                float franja = Mathf.Repeat((u + v) * 6f, 1f);
+                Color baseCol = franja < 0.5f ? gris : rojo;
+
+                float ruido = Mathf.PerlinNoise(u * 12f, v * 12f);
+                baseCol *= Mathf.Lerp(0.7f, 1.1f, ruido);
+
+                // Líneas oscuras entre franjas
+                if (franja < 0.03f || (franja > 0.5f && franja < 0.53f))
+                    baseCol *= 0.3f;
+
+                baseCol.a = 1f;
+                tex.SetPixel(x, y, baseCol);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    // ---------- Cámara ----------
+    void ConfigurarCamara()
+    {
+        var cam = Camera.main;
+        if (cam == null)
+        {
+            var go = new GameObject("Main Camera");
+            go.tag = "MainCamera";
+            cam = go.AddComponent<Camera>();
+            go.AddComponent<AudioListener>();
+        }
+        cam.transform.position = new Vector3(0f, alto / 2f, -ancho * 0.75f);
+        cam.transform.rotation = Quaternion.identity;
+        cam.fieldOfView = 50f;
+    }
+
+    // ---------- Material (funciona en URP o Built-in) ----------
+    Material NuevoMaterial(Color color)
+    {
+        Shader s = Shader.Find("Universal Render Pipeline/Lit");
+        if (s == null) s = Shader.Find("Standard");
+        if (s == null) s = Shader.Find("HDRP/Lit");
+        var m = new Material(s);
+        m.color = color;
+        return m;
+    }
+}
+
+// Control de la bola: WASD para mover, Espacio para saltar
+public class ControlBola : MonoBehaviour
+{
+    public float fuerzaMovimiento = 25f;
+    public float velocidadMaxima = 7f;
+    public float fuerzaSalto = 8f;
+    public float radio = 0.5f;
+    public bool moverEnProfundidad = true;
+
+    Rigidbody rb;
+    float h, v;
+    bool quiereSaltar;
+
+    void Awake() { rb = GetComponent<Rigidbody>(); }
+
+    void Update()
+    {
+        h = 0f; v = 0f;
+#if ENABLE_INPUT_SYSTEM
+        var k = Keyboard.current;
+        if (k != null)
+        {
+            h = (k.dKey.isPressed ? 1f : 0f) - (k.aKey.isPressed ? 1f : 0f);
+            v = (k.wKey.isPressed ? 1f : 0f) - (k.sKey.isPressed ? 1f : 0f);
+            if (k.spaceKey.wasPressedThisFrame) quiereSaltar = true;
+        }
+#else
+        h = Input.GetAxisRaw("Horizontal");
+        v = Input.GetAxisRaw("Vertical");
+        if (Input.GetKeyDown(KeyCode.Space)) quiereSaltar = true;
+#endif
+        if (!moverEnProfundidad) v = 0f;
+    }
+
+    void FixedUpdate()
+    {
+        rb.AddForce(new Vector3(h, 0f, v) * fuerzaMovimiento, ForceMode.Force);
+
+        // Limitar velocidad horizontal
+        Vector3 vel = rb.linearVelocity;
+        Vector3 plano = new Vector3(vel.x, 0f, vel.z);
+        if (plano.magnitude > velocidadMaxima)
+        {
+            plano = plano.normalized * velocidadMaxima;
+            rb.linearVelocity = new Vector3(plano.x, vel.y, plano.z);
+        }
+
+        if (quiereSaltar)
+        {
+            if (EnSuelo())
+            {
+                Vector3 vv = rb.linearVelocity;
+                rb.linearVelocity = new Vector3(vv.x, fuerzaSalto, vv.z);
+            }
+            quiereSaltar = false;
+        }
+    }
+
+    bool EnSuelo()
+    {
+        return Physics.Raycast(transform.position, Vector3.down, radio + 0.2f);
+    }
+}
