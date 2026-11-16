@@ -12,7 +12,7 @@ namespace PlatformerTools
     public static class VsPlayerGraph
     {
         private const float Force = 30f;
-        private const float JumpImpulse = 10f;
+        private const float JumpImpulse = 20f;
 
         public static string Build()
         {
