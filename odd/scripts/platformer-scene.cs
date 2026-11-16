@@ -76,6 +76,8 @@ namespace PlatformerTools
             body.freezeRotation = true;
             body.interpolation = RigidbodyInterpolation2D.Interpolate;
             body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+            player.AddComponent<Platformer.PlayerController>();
+            player.AddComponent<Platformer.KeyboardInput>();
 
             Platformer.CameraFollow follow = cameraObject.AddComponent<Platformer.CameraFollow>();
             follow.Target = player.transform;
@@ -126,6 +128,16 @@ namespace PlatformerTools
                 if (player.GetComponent<BoxCollider2D>() == null)
                 {
                     problems.Add("player has no BoxCollider2D");
+                }
+
+                if (player.GetComponent<Platformer.PlayerController>() == null)
+                {
+                    problems.Add("player has no PlayerController");
+                }
+
+                if (player.GetComponent<Platformer.KeyboardInput>() == null)
+                {
+                    problems.Add("player has no KeyboardInput");
                 }
             }
 
