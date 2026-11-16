@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections;
@@ -36,6 +37,18 @@ public class MovimientoJugador : MonoBehaviour
     [SerializeField]
     private float radioGroundCheck = 0.2f;
 
+    [Header("Comentarios")]
+    [SerializeField]
+    private string[] comentarios =
+    {
+        "¡Vamos!",
+        "Puedo hacerlo.",
+        "No me rendiré.",
+        "¡Un intento más!",
+        "Esto se está poniendo difícil...",
+        "¡Sigo adelante!"
+    };
+
     private Rigidbody2D rb;
 
     private bool enSuelo = false;
@@ -48,7 +61,7 @@ public class MovimientoJugador : MonoBehaviour
     private bool haciendoDash = false;
     private bool esperandoDash = false;
 
-    // Velocidad vertical del frame anterior (para el sonido de aterrizaje)
+    // Velocidad vertical del frame anterior
     private float velocidadYPrevia = 0f;
 
     private void Awake()
@@ -64,6 +77,7 @@ public class MovimientoJugador : MonoBehaviour
         Mover();
         Saltar();
         Dash();
+        MostrarComentario();
 
         velocidadYPrevia = rb.linearVelocity.y;
     }
@@ -83,7 +97,7 @@ public class MovimientoJugador : MonoBehaviour
         {
             cargaDobleSalto = 1;
 
-            // Solo suena si venia cayendo de verdad
+            // Solo suena si venía cayendo de verdad
             if (velocidadYPrevia < -3f)
             {
                 AudioManager.Aterrizar();
@@ -211,6 +225,20 @@ public class MovimientoJugador : MonoBehaviour
         }
     }
 
+    // Muestra un comentario aleatorio al presionar Q
+    private void MostrarComentario()
+    {
+        if (Keyboard.current.qKey.wasPressedThisFrame)
+        {
+            if (comentarios != null && comentarios.Length > 0)
+            {
+                int indice = Random.Range(0, comentarios.Length);
+
+                Debug.Log(comentarios[indice]);
+            }
+        }
+    }
+
     private void OnDrawGizmosSelected()
     {
         if (groundCheck == null)
@@ -223,5 +251,4 @@ public class MovimientoJugador : MonoBehaviour
             radioGroundCheck
         );
     }
-
 }
