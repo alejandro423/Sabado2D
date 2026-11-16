@@ -5,6 +5,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace PlatformerTools
 {
@@ -28,6 +29,7 @@ namespace PlatformerTools
             Sprite playerSprite = LoadSprite("player");
             Sprite groundSprite = LoadSprite("ground");
             Sprite wallSprite = LoadSprite("wall");
+            Sprite coinSprite = LoadSprite("coin");
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "Platformer";
@@ -61,6 +63,36 @@ namespace PlatformerTools
             MakeRect("Platform A", level, groundSprite, new Vector2(0f, -2f), new Vector2(5f, 1f));
             MakeRect("Platform B", level, groundSprite, new Vector2(6f, -0.25f), new Vector2(4f, 1f));
             MakeRect("Platform C", level, groundSprite, new Vector2(11.5f, 1.25f), new Vector2(4f, 1f));
+
+            MakeCoin("Coin A", level, coinSprite, new Vector2(-1f, -1.1f));
+            MakeCoin("Coin B", level, coinSprite, new Vector2(6f, 0.65f));
+            MakeCoin("Coin C", level, coinSprite, new Vector2(11.5f, 2.15f));
+
+            // HUD
+            Canvas hud = new GameObject("HUD").AddComponent<Canvas>();
+            hud.renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = hud.gameObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            hud.gameObject.AddComponent<GraphicRaycaster>();
+
+            GameObject scoreObject = new GameObject("Score Text");
+            scoreObject.transform.SetParent(hud.transform, false);
+            Text scoreText = scoreObject.AddComponent<Text>();
+            scoreText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            scoreText.fontSize = 48;
+            scoreText.color = Color.white;
+            scoreText.alignment = TextAnchor.UpperLeft;
+            scoreText.text = "Monedas: 0";
+            RectTransform scoreRect = scoreObject.GetComponent<RectTransform>();
+            scoreRect.anchorMin = new Vector2(0f, 1f);
+            scoreRect.anchorMax = new Vector2(0f, 1f);
+            scoreRect.pivot = new Vector2(0f, 1f);
+            scoreRect.anchoredPosition = new Vector2(40f, -30f);
+            scoreRect.sizeDelta = new Vector2(500f, 80f);
+
+            Platformer.GameManager manager = new GameObject("Game Manager").AddComponent<Platformer.GameManager>();
+            manager.ScoreText = scoreText;
 
             // Player body; movement arrives in the player-controller step.
             GameObject player = new GameObject("Player");
@@ -184,12 +216,56 @@ namespace PlatformerTools
                 problems.Add("scene is not enabled in build settings");
             }
 
+            Platformer.Coin[] coins = Object.FindObjectsByType<Platformer.Coin>();
+            if (coins.Length != 3)
+            {
+                problems.Add("expected 3 coins, found " + coins.Length);
+            }
+
+            foreach (Platformer.Coin coin in coins)
+            {
+                Collider2D trigger = coin.GetComponent<Collider2D>();
+                if (trigger == null || !trigger.isTrigger)
+                {
+                    problems.Add("coin " + coin.name + " has no trigger collider");
+                }
+            }
+
+            Platformer.GameManager manager = Object.FindAnyObjectByType<Platformer.GameManager>();
+            if (manager == null)
+            {
+                problems.Add("missing GameManager");
+            }
+            else if (manager.ScoreText == null)
+            {
+                problems.Add("GameManager has no score text");
+            }
+
+            if (Object.FindAnyObjectByType<Canvas>() == null)
+            {
+                problems.Add("missing HUD canvas");
+            }
+
             if (problems.Count > 0)
             {
                 throw new System.Exception("scene verification failed: " + string.Join("; ", problems));
             }
 
             return string.Format("scene ok: {0} roots, {1} box colliders, build settings enabled", scene.GetRootGameObjects().Length, colliders);
+        }
+
+        private static void MakeCoin(string name, Transform parent, Sprite sprite, Vector2 position)
+        {
+            GameObject coin = new GameObject(name);
+            coin.transform.SetParent(parent, false);
+            coin.transform.position = position;
+            SpriteRenderer renderer = coin.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.sortingOrder = 5;
+            CircleCollider2D trigger = coin.AddComponent<CircleCollider2D>();
+            trigger.radius = 0.25f;
+            trigger.isTrigger = true;
+            coin.AddComponent<Platformer.Coin>();
         }
 
         private static void MakeRect(string name, Transform parent, Sprite sprite, Vector2 position, Vector2 size)
