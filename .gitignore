@@ -6,6 +6,9 @@
 # See: https://github.com/github/gitignore/tree/main/Global
 #
 .utmp/
+
+# Original reference sheets; only scene resources belong in Assets.
+/asset16/
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
