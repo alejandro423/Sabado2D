@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections;
+using TMPro;
 
 public class MovimientoJugador : MonoBehaviour
 {
@@ -36,6 +37,33 @@ public class MovimientoJugador : MonoBehaviour
     [SerializeField]
     private float radioGroundCheck = 0.2f;
 
+    [Header("Comentarios")]
+    [SerializeField]
+    private TMP_Text textoComentario;
+
+    [SerializeField]
+    private string[] comentarios =
+    {
+        "¡Vamos!",
+        "Puedo hacerlo.",
+        "No me rendiré.",
+        "¡Un intento más!",
+        "Esto se está poniendo difícil...",
+        "¡Sigo adelante!",
+        "¿Qué está pasando?",
+        "¡Por aquí!",
+        "Necesito descansar...",
+        "¡No voy a rendirme!"
+    };
+
+    [SerializeField]
+    private float duracionComentario = 2f;
+
+    [SerializeField]
+    private Vector3 desplazamientoComentario = new Vector3(0f, 1.2f, 0f);
+
+    private Coroutine rutinaComentario;
+
     private Rigidbody2D rb;
 
     private bool enSuelo = false;
@@ -48,13 +76,18 @@ public class MovimientoJugador : MonoBehaviour
     private bool haciendoDash = false;
     private bool esperandoDash = false;
 
-    // Velocidad vertical del frame anterior (para el sonido de aterrizaje)
+    // Velocidad vertical del frame anterior
     private float velocidadYPrevia = 0f;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         rb.gravityScale = gravedad;
+
+        if (textoComentario != null)
+        {
+            textoComentario.gameObject.SetActive(false);
+        }
     }
 
     private void Update()
@@ -64,6 +97,7 @@ public class MovimientoJugador : MonoBehaviour
         Mover();
         Saltar();
         Dash();
+        MostrarComentario();
 
         velocidadYPrevia = rb.linearVelocity.y;
     }
@@ -83,7 +117,7 @@ public class MovimientoJugador : MonoBehaviour
         {
             cargaDobleSalto = 1;
 
-            // Solo suena si venia cayendo de verdad
+            // Solo suena si venía cayendo de verdad
             if (velocidadYPrevia < -3f)
             {
                 AudioManager.Aterrizar();
@@ -134,8 +168,8 @@ public class MovimientoJugador : MonoBehaviour
 
         // Doble salto
         else if (Keyboard.current.sKey.wasPressedThisFrame
-                 && !enSuelo
-                 && cargaDobleSalto == 1)
+            && !enSuelo
+            && cargaDobleSalto == 1)
         {
             cargaDobleSalto = 0;
 
@@ -211,6 +245,52 @@ public class MovimientoJugador : MonoBehaviour
         }
     }
 
+    // Muestra un comentario aleatorio encima del jugador
+    private void MostrarComentario()
+    {
+        if (Keyboard.current == null)
+            return;
+
+        if (!Keyboard.current.qKey.wasPressedThisFrame)
+            return;
+
+        if (textoComentario == null)
+            return;
+
+        if (comentarios == null || comentarios.Length == 0)
+            return;
+
+        // Elegir comentario aleatorio
+        int indice = Random.Range(0, comentarios.Length);
+
+        textoComentario.text = comentarios[indice];
+
+        // Colocar el texto encima del jugador
+        textoComentario.transform.position =
+        transform.position + desplazamientoComentario;
+
+        // Mostrar comentario
+        textoComentario.gameObject.SetActive(true);
+
+        // Reiniciar temporizador si ya había un comentario
+        if (rutinaComentario != null)
+        {
+            StopCoroutine(rutinaComentario);
+        }
+
+        rutinaComentario = StartCoroutine(OcultarComentario());
+    }
+
+    // Oculta el comentario después de unos segundos
+    private IEnumerator OcultarComentario()
+    {
+        yield return new WaitForSeconds(duracionComentario);
+
+        textoComentario.gameObject.SetActive(false);
+
+        rutinaComentario = null;
+    }
+
     private void OnDrawGizmosSelected()
     {
         if (groundCheck == null)
@@ -223,5 +303,4 @@ public class MovimientoJugador : MonoBehaviour
             radioGroundCheck
         );
     }
-
 }
