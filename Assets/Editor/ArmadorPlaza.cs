@@ -85,6 +85,7 @@ public static class ArmadorPlaza
         }
 
         SpriteRenderer render = cubito.GetComponent<SpriteRenderer>();
+        render.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpriteCubito);
         render.sortingOrder = 50;
 
         // que se vea bien, parado justo sobre el suelo
