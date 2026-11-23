@@ -3,7 +3,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
 
-// arma el nivel de plataformas en la plaza
+// arma el nivel largo de plataformas en la plaza
 // se usa desde el menu: Plaza > Armar juego de puntos
 public static class ArmadorPlaza
 {
@@ -16,17 +16,21 @@ public static class ArmadorPlaza
 
     const string RutaSpriteCubito = "Assets/ArteBoliviano/cubito_gorrito.png";
     const string RutaSpritePlataforma = "Assets/ArteBoliviano/plataforma_madera.png";
-    const string RutaFondo = "Assets/ArteBoliviano/fondo_plaza_plataformas.png";
+    const string RutaFondo = "Assets/ArteBoliviano/fondo_plaza.png";
 
-    // la linea del piso esta dibujada en el fondo nuevo, no se calcula
-    const float SueloY = -3.53f;
+    // el nivel son tres pantallas pegadas una al lado de la otra
+    const float AnchoSegmento = 19.2f;
+    const int Segmentos = 3;
+    const float BordeMundo = AnchoSegmento * Segmentos / 2f;
 
-    // el cubito mide 1.8 unidades y los vecinos 2.2, como en una plaza real
+    // la linea del piso es la misma donde estan parados los vecinos
+    const float SueloY = -3.28f;
+
     const float AlturaDelCubito = 2f;
     const float EscalaDelCubito = 0.9f;
     const float EscalaDeVecino = 0.262f;
 
-    const int PuntosMeta = 160;
+    const int PuntosMeta = 240;
 
     [MenuItem("Plaza/Armar juego de puntos")]
     public static void Armar()
@@ -42,8 +46,9 @@ public static class ArmadorPlaza
 
         DesarmarCholita();
         AjustarVecinos();
-        PrepararCubito(capaPiso);
-        CambiarFondo();
+        GameObject cubito = PrepararCubito(capaPiso);
+        PrepararCamara(cubito);
+        CrearFondos();
         CrearPiso(capaPiso);
         CrearBordes(capaPiso);
         CrearPlataformas(capaPiso);
@@ -54,7 +59,7 @@ public static class ArmadorPlaza
 
         EditorSceneManager.MarkAllScenesDirty();
         EditorSceneManager.SaveOpenScenes();
-        Debug.Log("plaza lista, salta con w y junta las 16 monedas");
+        Debug.Log("plaza lista, el nivel mide " + (AnchoSegmento * Segmentos) + " de largo");
     }
 
     [MenuItem("Plaza/Limpiar armado")]
@@ -73,8 +78,13 @@ public static class ArmadorPlaza
         Destruir("Cajas de la plaza");
         Destruir("Cubito");
         Destruir("MusicaPlaza");
+        Destruir("Fondo izquierdo");
+        Destruir("Fondo derecho");
 
         DesarmarCholita();
+
+        var camara = GameObject.Find("Main Camera");
+        if (camara != null) Quitar<CamaraPlaza>(camara);
 
         EditorSceneManager.MarkAllScenesDirty();
         Debug.Log("plaza limpia");
@@ -106,7 +116,7 @@ public static class ArmadorPlaza
         }
     }
 
-    static void PrepararCubito(int capaPiso)
+    static GameObject PrepararCubito(int capaPiso)
     {
         GameObject cubito = GameObject.Find("Cubito");
 
@@ -114,7 +124,6 @@ public static class ArmadorPlaza
         {
             cubito = new GameObject("Cubito");
             cubito.AddComponent<SpriteRenderer>();
-            cubito.transform.position = new Vector3(-3f, 0f, 0f);
         }
 
         SpriteRenderer render = cubito.GetComponent<SpriteRenderer>();
@@ -122,6 +131,7 @@ public static class ArmadorPlaza
         render.sortingOrder = 50;
 
         cubito.transform.localScale = Vector3.one * EscalaDelCubito;
+        cubito.transform.position = new Vector3(-24f, 0f, 0f);
         PararEnElSuelo(cubito, render);
 
         var datos = render.sprite;
@@ -153,6 +163,22 @@ public static class ArmadorPlaza
         }
         pies.localPosition = new Vector3(caja.offset.x, caja.offset.y - caja.size.y / 2f, 0f);
         movimiento.pies = pies;
+
+        return cubito;
+    }
+
+    static void PrepararCamara(GameObject cubito)
+    {
+        var camara = GameObject.Find("Main Camera");
+        if (camara == null) return;
+
+        var script = camara.GetComponent<CamaraPlaza>();
+        if (script == null) script = camara.AddComponent<CamaraPlaza>();
+
+        script.objetivo = cubito.transform;
+        script.limiteIzquierdo = -(BordeMundo - 9.6f);
+        script.limiteDerecho = BordeMundo - 9.6f;
+        script.alturaFija = 0f;
     }
 
     static void PararEnElSuelo(GameObject objeto, SpriteRenderer render)
@@ -162,14 +188,35 @@ public static class ArmadorPlaza
         objeto.transform.position += new Vector3(0f, diferencia, 0f);
     }
 
-    static void CambiarFondo()
+    static void CrearFondos()
     {
-        var fondo = GameObject.Find("Fondo");
-        if (fondo == null) return;
-
         var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaFondo);
+        if (sprite == null) return;
+
+        var centro = GameObject.Find("Fondo");
+        if (centro != null)
+        {
+            var render = centro.GetComponent<SpriteRenderer>();
+            if (render != null) render.sprite = sprite;
+        }
+
+        CrearFondoLateral("Fondo izquierdo", -AnchoSegmento, sprite, true);
+        CrearFondoLateral("Fondo derecho", AnchoSegmento, sprite, true);
+    }
+
+    static void CrearFondoLateral(string nombre, float x, Sprite sprite, bool espejado)
+    {
+        var fondo = GameObject.Find(nombre);
+        if (fondo == null) fondo = new GameObject(nombre);
+
         var render = fondo.GetComponent<SpriteRenderer>();
-        if (sprite != null && render != null) render.sprite = sprite;
+        if (render == null) render = fondo.AddComponent<SpriteRenderer>();
+        render.sprite = sprite;
+        render.sortingOrder = -100;
+
+        var escala = fondo.transform.localScale;
+        fondo.transform.localScale = new Vector3(espejado ? -Mathf.Abs(escala.x) : Mathf.Abs(escala.x), escala.y, escala.z);
+        fondo.transform.position = new Vector3(x, 0f, 1f);
     }
 
     static void CrearPiso(int capaPiso)
@@ -180,14 +227,14 @@ public static class ArmadorPlaza
         piso.layer = capaPiso;
         var caja = piso.GetComponent<BoxCollider2D>();
         if (caja == null) caja = piso.AddComponent<BoxCollider2D>();
-        caja.size = new Vector2(40f, 0.5f);
+        caja.size = new Vector2(BordeMundo * 2f + 2f, 0.5f);
         piso.transform.position = new Vector3(0f, SueloY - 0.25f, 0f);
     }
 
     static void CrearBordes(int capaPiso)
     {
-        CrearBorde("Borde izquierdo", -20.25f, capaPiso);
-        CrearBorde("Borde derecho", 20.25f, capaPiso);
+        CrearBorde("Borde izquierdo", -BordeMundo - 0.25f, capaPiso);
+        CrearBorde("Borde derecho", BordeMundo + 0.25f, capaPiso);
     }
 
     static void CrearBorde(string nombre, float x, int capaPiso)
@@ -212,10 +259,13 @@ public static class ArmadorPlaza
             Object.DestroyImmediate(padre.transform.GetChild(i).gameObject);
         }
 
-        // izquierda y derecha bajas, el medio mas alto: se sube en escalones
-        CrearPlataforma(padre, capaPiso, "Plataforma izquierda", -6f, 3.4f, SueloY + 1.6f);
-        CrearPlataforma(padre, capaPiso, "Plataforma derecha", 6f, 3.4f, SueloY + 1.6f);
-        CrearPlataforma(padre, capaPiso, "Plataforma del medio", 0f, 4.4f, SueloY + 2.9f);
+        for (int i = 0; i < Segmentos; i++)
+        {
+            float centro = (i - 1) * AnchoSegmento;
+
+            CrearPlataforma(padre, capaPiso, "Plataforma baja " + (i + 1), centro - 7f, 3.4f, SueloY + 1.6f);
+            CrearPlataforma(padre, capaPiso, "Plataforma alta " + (i + 1), centro - 4.2f, 3.4f, SueloY + 2.9f);
+        }
     }
 
     static void CrearPlataforma(GameObject padre, int capaPiso, string nombre, float x, float ancho, float techoY)
@@ -228,7 +278,6 @@ public static class ArmadorPlaza
         sprite.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpritePlataforma);
         sprite.sortingOrder = 3;
 
-        // el png mide 0.96 x 0.48 unidades, se estira para el ancho pedido
         var colision = plataforma.AddComponent<BoxCollider2D>();
         colision.size = new Vector2(0.96f, 0.48f);
 
@@ -246,30 +295,26 @@ public static class ArmadorPlaza
         GameObject prefab = CargarOCrearPrefabMoneda();
         int indice = 0;
 
-        // en el piso, entre los vecinos
-        foreach (float x in new float[] { -7.5f, -6.2f, -3.2f, 0f, 3.3f, 6.5f })
+        for (int i = 0; i < Segmentos; i++)
         {
-            ColocarMoneda(prefab, x, SueloY + 0.9f, ++indice);
-        }
+            float centro = (i - 1) * AnchoSegmento;
 
-        // sobre las plataformas de los costados
-        foreach (float x in new float[] { -6.8f, -6f, -5.2f })
-        {
-            ColocarMoneda(prefab, x, SueloY + 2.4f, ++indice);
-        }
-        foreach (float x in new float[] { 5.2f, 6f, 6.8f })
-        {
-            ColocarMoneda(prefab, x, SueloY + 2.4f, ++indice);
-        }
+            // en el piso
+            ColocarMoneda(prefab, centro + 3.3f, SueloY + 0.9f, ++indice);
+            ColocarMoneda(prefab, centro + 6.5f, SueloY + 0.9f, ++indice);
 
-        // sobre la plataforma del medio
-        foreach (float x in new float[] { -1f, 0f, 1f })
-        {
-            ColocarMoneda(prefab, x, SueloY + 3.7f, ++indice);
-        }
+            // sobre la plataforma baja
+            foreach (float x in new float[] { centro - 7.8f, centro - 7f, centro - 6.2f })
+            {
+                ColocarMoneda(prefab, x, SueloY + 2.4f, ++indice);
+            }
 
-        // una en el aire, entre las dos plataformas bajas
-        ColocarMoneda(prefab, -3.2f, SueloY + 1.8f, ++indice);
+            // sobre la plataforma alta
+            foreach (float x in new float[] { centro - 5f, centro - 4.2f, centro - 3.4f })
+            {
+                ColocarMoneda(prefab, x, SueloY + 3.7f, ++indice);
+            }
+        }
     }
 
     static void ColocarMoneda(GameObject prefab, float x, float y, int indice)
