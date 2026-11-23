@@ -12,7 +12,11 @@ public static class ArmadorPlaza
     const string RutaSpriteMoneda = "Assets/Art/coin.png";
     const string RutaSonidoMoneda = "Assets/SonidosPlaza/moneda.wav";
     const string RutaSpriteCubito = "Assets/ArteBoliviano/cubito_gorrito.png";
+    const string RutaSpriteCaja = "Assets/ArteBoliviano/caja_madera.png";
+    const string RutaMusicaHuayno = "Assets/SonidosPlaza/huayno_plaza.wav";
     const float AlturaDelCubito = 2f;
+    const float EscalaDelCubito = 2f;
+    const int PuntosMeta = 160;
 
     [MenuItem("Plaza/Armar juego de puntos")]
     public static void Armar()
@@ -32,8 +36,11 @@ public static class ArmadorPlaza
         float alturaPies = PrepararCubito(capaPiso);
         CrearPiso(alturaPies, capaPiso);
         CrearBordes(alturaPies, capaPiso);
+        CrearCajas(alturaPies, capaPiso);
         ColocarMonedas(alturaPies);
         CrearPuntaje();
+        AjustarMeta();
+        CrearMusica();
 
         EditorSceneManager.MarkAllScenesDirty();
         EditorSceneManager.SaveOpenScenes();
@@ -52,7 +59,9 @@ public static class ArmadorPlaza
         Destruir("Borde izquierdo");
         Destruir("Borde derecho");
         Destruir("PlazaUI");
+        Destruir("Cajas de la plaza");
         Destruir("Cubito");
+        Destruir("MusicaPlaza");
 
         DesarmarCholita();
 
@@ -74,6 +83,14 @@ public static class ArmadorPlaza
         }
 
         SpriteRenderer render = cubito.GetComponent<SpriteRenderer>();
+
+        // que se vea bien, y parado justo sobre el piso
+        cubito.transform.localScale = Vector3.one * EscalaDelCubito;
+        cubito.transform.position = new Vector3(
+            cubito.transform.position.x,
+            LineaDeSuelo() + AlturaDelCubito * EscalaDelCubito / 2f,
+            0f);
+
         var datos = render.sprite;
 
         float ancho = datos.rect.width / datos.pixelsPerUnit;
@@ -161,6 +178,36 @@ public static class ArmadorPlaza
         borde.transform.position = new Vector3(x, alturaPies + 5f, 0f);
     }
 
+    static void CrearCajas(float alturaPies, int capaPiso)
+    {
+        GameObject padre = GameObject.Find("Cajas de la plaza");
+        if (padre == null) padre = new GameObject("Cajas de la plaza");
+
+        // se rehacen cada vez para que queden siempre bien puestas
+        for (int i = padre.transform.childCount - 1; i >= 0; i--)
+        {
+            Object.DestroyImmediate(padre.transform.GetChild(i).gameObject);
+        }
+
+        float[] posiciones = { -7f, -3.5f, 0f, 3.5f, 7f };
+        for (int i = 0; i < posiciones.Length; i++)
+        {
+            var caja = new GameObject("Caja " + (i + 1));
+            caja.transform.SetParent(padre.transform, false);
+
+            var sprite = caja.AddComponent<SpriteRenderer>();
+            sprite.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpriteCaja);
+            sprite.sortingOrder = 3;
+
+            var colision = caja.AddComponent<BoxCollider2D>();
+            colision.size = new Vector2(1f, 1f);
+
+            caja.layer = capaPiso;
+            caja.transform.localScale = Vector3.one * 2f;
+            caja.transform.position = new Vector3(posiciones[i], alturaPies + 1f, 0f);
+        }
+    }
+
     static void ColocarMonedas(float alturaPies)
     {
         foreach (MonedaPlaza moneda in Object.FindObjectsByType<MonedaPlaza>(FindObjectsInactive.Exclude))
@@ -171,17 +218,57 @@ public static class ArmadorPlaza
         GameObject prefab = CargarOCrearPrefabMoneda();
 
         int indice = 0;
-        for (int fila = 0; fila < 2; fila++)
+
+        // fila baja, en los huecos entre las cajas
+        foreach (float x in new float[] { -5.25f, -1.75f, 1.75f, 5.25f })
         {
-            for (int i = 0; i < 5; i++)
-            {
-                var moneda = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-                float x = -6f + i * 3f + (fila == 1 ? 1.5f : 0f);
-                float y = alturaPies + (fila == 0 ? 0.7f : 1.9f);
-                moneda.transform.position = new Vector3(x, y, 0f);
-                moneda.name = "Moneda " + (++indice);
-            }
+            ColocarMoneda(prefab, x, alturaPies + 0.9f, ++indice);
         }
+
+        // fila sobre las cajas
+        foreach (float x in new float[] { -7f, -3.5f, 0f, 3.5f, 7f })
+        {
+            ColocarMoneda(prefab, x, alturaPies + 2.7f, ++indice);
+        }
+
+        // fila alta, se llega saltando desde las cajas
+        for (int i = 0; i < 7; i++)
+        {
+            ColocarMoneda(prefab, -6f + i * 2f, alturaPies + 4.5f, ++indice);
+        }
+    }
+
+    static void ColocarMoneda(GameObject prefab, float x, float y, int indice)
+    {
+        var moneda = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+        moneda.transform.position = new Vector3(x, y, 0f);
+        moneda.name = "Moneda " + indice;
+    }
+
+    static void AjustarMeta()
+    {
+        foreach (PuntosPlaza puntaje in Object.FindObjectsByType<PuntosPlaza>(FindObjectsInactive.Exclude))
+        {
+            puntaje.puntosMeta = PuntosMeta;
+        }
+    }
+
+    static void CrearMusica()
+    {
+        var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(RutaMusicaHuayno);
+        if (clip == null)
+        {
+            Debug.Log("todavia no hay musica del huayno, cuando exista el wav la agrego aca");
+            return;
+        }
+
+        if (GameObject.Find("MusicaPlaza") != null) return;
+
+        var musica = new GameObject("MusicaPlaza");
+        var fuente = musica.AddComponent<AudioSource>();
+        fuente.clip = clip;
+        fuente.loop = true;
+        musica.AddComponent<MusicaPlaza>();
     }
 
     static GameObject CargarOCrearPrefabMoneda()
