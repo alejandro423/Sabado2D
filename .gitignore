@@ -107,3 +107,6 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# config de la herramienta aura, no va al repo
+/.Aura/
