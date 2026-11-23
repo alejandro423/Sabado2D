@@ -10,6 +10,9 @@ public static class ArmadorPlaza
     const string NombreCapaPiso = "Piso";
     const string RutaMoneda = "Assets/PrefabsPlaza/Moneda.prefab";
     const string RutaSpriteMoneda = "Assets/Art/coin.png";
+    const string RutaSonidoMoneda = "Assets/SonidosPlaza/moneda.wav";
+    const string RutaSpriteCubito = "Assets/ArteBoliviano/cubito_gorrito.png";
+    const float AlturaDelCubito = 2f;
 
     [MenuItem("Plaza/Armar juego de puntos")]
     public static void Armar()
@@ -24,7 +27,9 @@ public static class ArmadorPlaza
         AsegurarCapaPiso();
         int capaPiso = LayerMask.NameToLayer(NombreCapaPiso);
 
-        float alturaPies = PrepararJugadora(cholita, capaPiso);
+        // la cholita queda como parte del decorado, el jugador es el cubito
+        DesarmarCholita();
+        float alturaPies = PrepararCubito(capaPiso);
         CrearPiso(alturaPies, capaPiso);
         CrearBordes(alturaPies, capaPiso);
         ColocarMonedas(alturaPies);
@@ -47,56 +52,83 @@ public static class ArmadorPlaza
         Destruir("Borde izquierdo");
         Destruir("Borde derecho");
         Destruir("PlazaUI");
+        Destruir("Cubito");
 
-        GameObject cholita = GameObject.Find("Cholita Paceña");
-        if (cholita != null)
-        {
-            Quitar<MovimientoPlaza>(cholita);
-            Quitar<BoxCollider2D>(cholita);
-            Quitar<Rigidbody2D>(cholita);
-            Transform pies = cholita.transform.Find("Pies");
-            if (pies != null) Object.DestroyImmediate(pies.gameObject);
-        }
+        DesarmarCholita();
 
         EditorSceneManager.MarkAllScenesDirty();
         Debug.Log("plaza limpia");
     }
 
-    static float PrepararJugadora(GameObject cholita, int capaPiso)
+    static float PrepararCubito(int capaPiso)
     {
-        SpriteRenderer sprite = cholita.GetComponent<SpriteRenderer>();
-        var datos = sprite.sprite;
+        GameObject cubito = GameObject.Find("Cubito");
+
+        if (cubito == null)
+        {
+            cubito = new GameObject("Cubito");
+            var sprite = cubito.AddComponent<SpriteRenderer>();
+            sprite.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpriteCubito);
+            sprite.sortingOrder = 5;
+            cubito.transform.position = new Vector3(-3f, LineaDeSuelo() + AlturaDelCubito / 2f, 0f);
+        }
+
+        SpriteRenderer render = cubito.GetComponent<SpriteRenderer>();
+        var datos = render.sprite;
 
         float ancho = datos.rect.width / datos.pixelsPerUnit;
         float alto = datos.rect.height / datos.pixelsPerUnit;
         var pivote = new Vector2(datos.pivot.x / datos.pixelsPerUnit, datos.pivot.y / datos.pixelsPerUnit);
 
-        var caja = cholita.GetComponent<BoxCollider2D>();
-        if (caja == null) caja = cholita.AddComponent<BoxCollider2D>();
+        var caja = cubito.GetComponent<BoxCollider2D>();
+        if (caja == null) caja = cubito.AddComponent<BoxCollider2D>();
         caja.size = new Vector2(ancho * 0.8f, alto * 0.9f);
         caja.offset = new Vector2(pivote.x - ancho / 2f, pivote.y - alto / 2f);
 
-        var cuerpo = cholita.GetComponent<Rigidbody2D>();
-        if (cuerpo == null) cuerpo = cholita.AddComponent<Rigidbody2D>();
+        var cuerpo = cubito.GetComponent<Rigidbody2D>();
+        if (cuerpo == null) cuerpo = cubito.AddComponent<Rigidbody2D>();
         cuerpo.freezeRotation = true;
         cuerpo.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
-        var movimiento = cholita.GetComponent<MovimientoPlaza>();
-        if (movimiento == null) movimiento = cholita.AddComponent<MovimientoPlaza>();
+        var movimiento = cubito.GetComponent<MovimientoPlaza>();
+        if (movimiento == null) movimiento = cubito.AddComponent<MovimientoPlaza>();
         movimiento.velocidad = 4f;
         movimiento.fuerzaSalto = 7f;
         movimiento.capaSuelo = LayerMask.GetMask(NombreCapaPiso);
 
-        Transform pies = cholita.transform.Find("Pies");
+        Transform pies = cubito.transform.Find("Pies");
         if (pies == null)
         {
             pies = new GameObject("Pies").transform;
-            pies.SetParent(cholita.transform, false);
+            pies.SetParent(cubito.transform, false);
         }
         pies.localPosition = new Vector3(caja.offset.x, caja.offset.y - caja.size.y / 2f, 0f);
         movimiento.pies = pies;
 
-        return cholita.transform.position.y - caja.offset.y + caja.size.y / 2f - caja.size.y;
+        return cubito.transform.position.y - caja.offset.y + caja.size.y / 2f - caja.size.y;
+    }
+
+    static float LineaDeSuelo()
+    {
+        GameObject piso = GameObject.Find("Piso de la plaza");
+        if (piso != null) return piso.transform.position.y + 0.25f;
+
+        GameObject cholita = GameObject.Find("Cholita Paceña");
+        if (cholita != null) return cholita.GetComponent<SpriteRenderer>().bounds.min.y;
+
+        return 0f;
+    }
+
+    static void DesarmarCholita()
+    {
+        GameObject cholita = GameObject.Find("Cholita Paceña");
+        if (cholita == null) return;
+
+        Quitar<MovimientoPlaza>(cholita);
+        Quitar<BoxCollider2D>(cholita);
+        Quitar<Rigidbody2D>(cholita);
+        Transform pies = cholita.transform.Find("Pies");
+        if (pies != null) Object.DestroyImmediate(pies.gameObject);
     }
 
     static void CrearPiso(float alturaPies, int capaPiso)
@@ -155,27 +187,43 @@ public static class ArmadorPlaza
     static GameObject CargarOCrearPrefabMoneda()
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(RutaMoneda);
-        if (prefab != null) return prefab;
 
-        if (AssetDatabase.IsValidFolder("Assets/PrefabsPlaza") == false)
+        if (prefab == null)
         {
-            AssetDatabase.CreateFolder("Assets", "PrefabsPlaza");
+            if (AssetDatabase.IsValidFolder("Assets/PrefabsPlaza") == false)
+            {
+                AssetDatabase.CreateFolder("Assets", "PrefabsPlaza");
+            }
+
+            var temp = new GameObject("Moneda");
+            var sprite = temp.AddComponent<SpriteRenderer>();
+            sprite.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpriteMoneda);
+
+            var caja = temp.AddComponent<BoxCollider2D>();
+            caja.isTrigger = true;
+            var datos = sprite.sprite;
+            caja.size = new Vector2(datos.rect.width, datos.rect.height) / datos.pixelsPerUnit;
+
+            temp.AddComponent<MonedaPlaza>();
+
+            prefab = PrefabUtility.SaveAsPrefabAsset(temp, RutaMoneda);
+            Object.DestroyImmediate(temp);
         }
 
-        var temp = new GameObject("Moneda");
-        var sprite = temp.AddComponent<SpriteRenderer>();
-        sprite.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpriteMoneda);
-
-        var caja = temp.AddComponent<BoxCollider2D>();
-        caja.isTrigger = true;
-        var datos = sprite.sprite;
-        caja.size = new Vector2(datos.rect.width, datos.rect.height) / datos.pixelsPerUnit;
-
-        temp.AddComponent<MonedaPlaza>();
-
-        prefab = PrefabUtility.SaveAsPrefabAsset(temp, RutaMoneda);
-        Object.DestroyImmediate(temp);
+        AsegurarSonidoDeMoneda(prefab);
         return prefab;
+    }
+
+    static void AsegurarSonidoDeMoneda(GameObject prefab)
+    {
+        var script = prefab.GetComponent<MonedaPlaza>();
+        if (script == null || script.sonido != null) return;
+
+        var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(RutaSonidoMoneda);
+        if (clip == null) return;
+
+        script.sonido = clip;
+        PrefabUtility.SavePrefabAsset(prefab);
     }
 
     static void CrearPuntaje()
