@@ -12,7 +12,7 @@ public static class ArmadorPlaza
     const string RutaMoneda = "Assets/PrefabsPlaza/Moneda.prefab";
     const string RutaSpriteMoneda = "Assets/Art/coin.png";
     const string RutaSonidoMoneda = "Assets/SonidosPlaza/moneda.wav";
-    const string RutaMusicaHuayno = "Assets/SonidosPlaza/huayno_plaza.wav";
+    const string RutaMusicaPlaza = "Assets/SonidosPlaza/Wendy Sulca - Cerveza, Cerveza.mp3";
 
     const string RutaSpriteCubito = "Assets/ArteBoliviano/cubito_gorrito.png";
     const string RutaSpritePlataforma = "Assets/ArteBoliviano/plataforma_madera.png";
@@ -416,20 +416,23 @@ public static class ArmadorPlaza
 
     static void CrearMusica()
     {
-        var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(RutaMusicaHuayno);
+        var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(RutaMusicaPlaza);
         if (clip == null)
         {
-            Debug.Log("todavia no hay musica del huayno, cuando exista el wav la agrego aca");
+            Debug.Log("todavia no hay musica para la plaza, cuando exista el archivo la agrego aca");
             return;
         }
 
-        if (GameObject.Find("MusicaPlaza") != null) return;
+        var musica = GameObject.Find("MusicaPlaza");
+        if (musica == null) musica = new GameObject("MusicaPlaza");
 
-        var musica = new GameObject("MusicaPlaza");
-        var fuente = musica.AddComponent<AudioSource>();
+        var fuente = musica.GetComponent<AudioSource>();
+        if (fuente == null) fuente = musica.AddComponent<AudioSource>();
         fuente.clip = clip;
         fuente.loop = true;
-        musica.AddComponent<MusicaPlaza>();
+        fuente.playOnAwake = true;
+
+        if (musica.GetComponent<MusicaPlaza>() == null) musica.AddComponent<MusicaPlaza>();
     }
 
     static void DesarmarCholita()
