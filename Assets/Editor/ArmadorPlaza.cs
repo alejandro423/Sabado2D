@@ -3,26 +3,35 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
 
-// arma el juego de puntos en la escena de la plaza
+// arma el nivel de plataformas en la plaza
 // se usa desde el menu: Plaza > Armar juego de puntos
 public static class ArmadorPlaza
 {
     const string NombreCapaPiso = "Piso";
+
     const string RutaMoneda = "Assets/PrefabsPlaza/Moneda.prefab";
     const string RutaSpriteMoneda = "Assets/Art/coin.png";
     const string RutaSonidoMoneda = "Assets/SonidosPlaza/moneda.wav";
-    const string RutaSpriteCubito = "Assets/ArteBoliviano/cubito_gorrito.png";
-    const string RutaSpriteCaja = "Assets/ArteBoliviano/caja_madera.png";
     const string RutaMusicaHuayno = "Assets/SonidosPlaza/huayno_plaza.wav";
+
+    const string RutaSpriteCubito = "Assets/ArteBoliviano/cubito_gorrito.png";
+    const string RutaSpritePlataforma = "Assets/ArteBoliviano/plataforma_madera.png";
+    const string RutaFondo = "Assets/ArteBoliviano/fondo_plaza_plataformas.png";
+
+    // la linea del piso esta dibujada en el fondo nuevo, no se calcula
+    const float SueloY = -3.53f;
+
+    // el cubito mide 1.8 unidades y los vecinos 2.2, como en una plaza real
     const float AlturaDelCubito = 2f;
-    const float EscalaDelCubito = 2f;
+    const float EscalaDelCubito = 0.9f;
+    const float EscalaDeVecino = 0.262f;
+
     const int PuntosMeta = 160;
 
     [MenuItem("Plaza/Armar juego de puntos")]
     public static void Armar()
     {
-        GameObject cholita = GameObject.Find("Cholita Paceña");
-        if (cholita == null)
+        if (GameObject.Find("Cholita Paceña") == null)
         {
             Debug.LogError("no encontre a la cholita, abri la escena PlazaBoliviana primero");
             return;
@@ -31,23 +40,21 @@ public static class ArmadorPlaza
         AsegurarCapaPiso();
         int capaPiso = LayerMask.NameToLayer(NombreCapaPiso);
 
-        // la cholita es la referencia fija del suelo de la plaza
-        float suelo = LineaDeSuelo(cholita);
-
-        // la cholita queda como parte del decorado, el jugador es el cubito
         DesarmarCholita();
-        PrepararCubito(capaPiso, suelo);
-        CrearPiso(suelo, capaPiso);
-        CrearBordes(suelo, capaPiso);
-        CrearCajas(suelo, capaPiso);
-        ColocarMonedas(suelo);
+        AjustarVecinos();
+        PrepararCubito(capaPiso);
+        CambiarFondo();
+        CrearPiso(capaPiso);
+        CrearBordes(capaPiso);
+        CrearPlataformas(capaPiso);
+        ColocarMonedas();
         CrearPuntaje();
         AjustarMeta();
         CrearMusica();
 
         EditorSceneManager.MarkAllScenesDirty();
         EditorSceneManager.SaveOpenScenes();
-        Debug.Log("plaza lista, fijate que la cholita salte con w y junte las monedas");
+        Debug.Log("plaza lista, salta con w y junta las 16 monedas");
     }
 
     [MenuItem("Plaza/Limpiar armado")]
@@ -62,6 +69,7 @@ public static class ArmadorPlaza
         Destruir("Borde izquierdo");
         Destruir("Borde derecho");
         Destruir("PlazaUI");
+        Destruir("Plataformas de la plaza");
         Destruir("Cajas de la plaza");
         Destruir("Cubito");
         Destruir("MusicaPlaza");
@@ -72,15 +80,40 @@ public static class ArmadorPlaza
         Debug.Log("plaza limpia");
     }
 
-    static void PrepararCubito(int capaPiso, float suelo)
+    static void AjustarVecinos()
+    {
+        var vecinos = new[]
+        {
+            ("Cholita Paceña", "Assets/ArteBoliviano/cholita.png"),
+            ("Campesino", "Assets/ArteBoliviano/campesino.png"),
+            ("Vendedora de Salteñas", "Assets/ArteBoliviano/vendedora.png"),
+            ("Charanguista", "Assets/ArteBoliviano/charanguista.png"),
+        };
+
+        foreach (var (nombre, ruta) in vecinos)
+        {
+            var vecino = GameObject.Find(nombre);
+            if (vecino == null) continue;
+
+            var render = vecino.GetComponent<SpriteRenderer>();
+            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(ruta);
+            if (render == null || sprite == null) continue;
+
+            render.sprite = sprite;
+            render.sortingOrder = 30;
+            vecino.transform.localScale = Vector3.one * EscalaDeVecino;
+            PararEnElSuelo(vecino, render);
+        }
+    }
+
+    static void PrepararCubito(int capaPiso)
     {
         GameObject cubito = GameObject.Find("Cubito");
 
         if (cubito == null)
         {
             cubito = new GameObject("Cubito");
-            var sprite = cubito.AddComponent<SpriteRenderer>();
-            sprite.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpriteCubito);
+            cubito.AddComponent<SpriteRenderer>();
             cubito.transform.position = new Vector3(-3f, 0f, 0f);
         }
 
@@ -88,15 +121,10 @@ public static class ArmadorPlaza
         render.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpriteCubito);
         render.sortingOrder = 50;
 
-        // que se vea bien, parado justo sobre el suelo
         cubito.transform.localScale = Vector3.one * EscalaDelCubito;
-        cubito.transform.position = new Vector3(
-            cubito.transform.position.x,
-            suelo + AlturaDelCubito * EscalaDelCubito / 2f,
-            0f);
+        PararEnElSuelo(cubito, render);
 
         var datos = render.sprite;
-
         float ancho = datos.rect.width / datos.pixelsPerUnit;
         float alto = datos.rect.height / datos.pixelsPerUnit;
         var pivote = new Vector2(datos.pivot.x / datos.pixelsPerUnit, datos.pivot.y / datos.pixelsPerUnit);
@@ -127,28 +155,24 @@ public static class ArmadorPlaza
         movimiento.pies = pies;
     }
 
-    static float LineaDeSuelo(GameObject cholita)
+    static void PararEnElSuelo(GameObject objeto, SpriteRenderer render)
     {
-        // los pies de la cholita son la referencia fija del suelo de la plaza
-        var sprite = cholita.GetComponent<SpriteRenderer>();
-        if (sprite != null) return sprite.bounds.min.y;
-
-        return 0f;
+        objeto.transform.position = new Vector3(objeto.transform.position.x, SueloY, 0f);
+        float diferencia = SueloY - render.bounds.min.y;
+        objeto.transform.position += new Vector3(0f, diferencia, 0f);
     }
 
-    static void DesarmarCholita()
+    static void CambiarFondo()
     {
-        GameObject cholita = GameObject.Find("Cholita Paceña");
-        if (cholita == null) return;
+        var fondo = GameObject.Find("Fondo");
+        if (fondo == null) return;
 
-        Quitar<MovimientoPlaza>(cholita);
-        Quitar<BoxCollider2D>(cholita);
-        Quitar<Rigidbody2D>(cholita);
-        Transform pies = cholita.transform.Find("Pies");
-        if (pies != null) Object.DestroyImmediate(pies.gameObject);
+        var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaFondo);
+        var render = fondo.GetComponent<SpriteRenderer>();
+        if (sprite != null && render != null) render.sprite = sprite;
     }
 
-    static void CrearPiso(float suelo, int capaPiso)
+    static void CrearPiso(int capaPiso)
     {
         GameObject piso = GameObject.Find("Piso de la plaza");
         if (piso == null) piso = new GameObject("Piso de la plaza");
@@ -157,16 +181,16 @@ public static class ArmadorPlaza
         var caja = piso.GetComponent<BoxCollider2D>();
         if (caja == null) caja = piso.AddComponent<BoxCollider2D>();
         caja.size = new Vector2(40f, 0.5f);
-        piso.transform.position = new Vector3(0f, suelo - 0.25f, 0f);
+        piso.transform.position = new Vector3(0f, SueloY - 0.25f, 0f);
     }
 
-    static void CrearBordes(float suelo, int capaPiso)
+    static void CrearBordes(int capaPiso)
     {
-        CrearBorde("Borde izquierdo", -20.25f, suelo, capaPiso);
-        CrearBorde("Borde derecho", 20.25f, suelo, capaPiso);
+        CrearBorde("Borde izquierdo", -20.25f, capaPiso);
+        CrearBorde("Borde derecho", 20.25f, capaPiso);
     }
 
-    static void CrearBorde(string nombre, float x, float suelo, int capaPiso)
+    static void CrearBorde(string nombre, float x, int capaPiso)
     {
         GameObject borde = GameObject.Find(nombre);
         if (borde == null) borde = new GameObject(nombre);
@@ -175,40 +199,44 @@ public static class ArmadorPlaza
         var caja = borde.GetComponent<BoxCollider2D>();
         if (caja == null) caja = borde.AddComponent<BoxCollider2D>();
         caja.size = new Vector2(0.5f, 10f);
-        borde.transform.position = new Vector3(x, suelo + 5f, 0f);
+        borde.transform.position = new Vector3(x, SueloY + 5f, 0f);
     }
 
-    static void CrearCajas(float suelo, int capaPiso)
+    static void CrearPlataformas(int capaPiso)
     {
-        GameObject padre = GameObject.Find("Cajas de la plaza");
-        if (padre == null) padre = new GameObject("Cajas de la plaza");
+        GameObject padre = GameObject.Find("Plataformas de la plaza");
+        if (padre == null) padre = new GameObject("Plataformas de la plaza");
 
-        // se rehacen cada vez para que queden siempre bien puestas
         for (int i = padre.transform.childCount - 1; i >= 0; i--)
         {
             Object.DestroyImmediate(padre.transform.GetChild(i).gameObject);
         }
 
-        float[] posiciones = { -7f, -3.5f, 0f, 3.5f, 7f };
-        for (int i = 0; i < posiciones.Length; i++)
-        {
-            var caja = new GameObject("Caja " + (i + 1));
-            caja.transform.SetParent(padre.transform, false);
-
-            var sprite = caja.AddComponent<SpriteRenderer>();
-            sprite.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpriteCaja);
-            sprite.sortingOrder = 3;
-
-            var colision = caja.AddComponent<BoxCollider2D>();
-            colision.size = new Vector2(1f, 1f);
-
-            caja.layer = capaPiso;
-            caja.transform.localScale = Vector3.one * 2f;
-            caja.transform.position = new Vector3(posiciones[i], suelo + 1f, 0f);
-        }
+        // izquierda y derecha bajas, el medio mas alto: se sube en escalones
+        CrearPlataforma(padre, capaPiso, "Plataforma izquierda", -6f, 3.4f, SueloY + 1.6f);
+        CrearPlataforma(padre, capaPiso, "Plataforma derecha", 6f, 3.4f, SueloY + 1.6f);
+        CrearPlataforma(padre, capaPiso, "Plataforma del medio", 0f, 4.4f, SueloY + 2.9f);
     }
 
-    static void ColocarMonedas(float suelo)
+    static void CrearPlataforma(GameObject padre, int capaPiso, string nombre, float x, float ancho, float techoY)
+    {
+        var plataforma = new GameObject(nombre);
+        plataforma.transform.SetParent(padre.transform, false);
+        plataforma.layer = capaPiso;
+
+        var sprite = plataforma.AddComponent<SpriteRenderer>();
+        sprite.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpritePlataforma);
+        sprite.sortingOrder = 3;
+
+        // el png mide 0.96 x 0.48 unidades, se estira para el ancho pedido
+        var colision = plataforma.AddComponent<BoxCollider2D>();
+        colision.size = new Vector2(0.96f, 0.48f);
+
+        plataforma.transform.localScale = new Vector3(ancho / 0.96f, 1f, 1f);
+        plataforma.transform.position = new Vector3(x, techoY - 0.24f, 0f);
+    }
+
+    static void ColocarMonedas()
     {
         foreach (MonedaPlaza moneda in Object.FindObjectsByType<MonedaPlaza>(FindObjectsInactive.Exclude))
         {
@@ -216,26 +244,32 @@ public static class ArmadorPlaza
         }
 
         GameObject prefab = CargarOCrearPrefabMoneda();
-
         int indice = 0;
 
-        // fila baja, en los huecos entre las cajas
-        foreach (float x in new float[] { -5.25f, -1.75f, 1.75f, 5.25f })
+        // en el piso, entre los vecinos
+        foreach (float x in new float[] { -7.5f, -6.2f, -3.2f, 0f, 3.3f, 6.5f })
         {
-            ColocarMoneda(prefab, x, suelo + 0.9f, ++indice);
+            ColocarMoneda(prefab, x, SueloY + 0.9f, ++indice);
         }
 
-        // fila sobre las cajas
-        foreach (float x in new float[] { -7f, -3.5f, 0f, 3.5f, 7f })
+        // sobre las plataformas de los costados
+        foreach (float x in new float[] { -6.8f, -6f, -5.2f })
         {
-            ColocarMoneda(prefab, x, suelo + 2.7f, ++indice);
+            ColocarMoneda(prefab, x, SueloY + 2.4f, ++indice);
+        }
+        foreach (float x in new float[] { 5.2f, 6f, 6.8f })
+        {
+            ColocarMoneda(prefab, x, SueloY + 2.4f, ++indice);
         }
 
-        // fila alta, se llega saltando desde las cajas
-        for (int i = 0; i < 7; i++)
+        // sobre la plataforma del medio
+        foreach (float x in new float[] { -1f, 0f, 1f })
         {
-            ColocarMoneda(prefab, -6f + i * 2f, suelo + 4.5f, ++indice);
+            ColocarMoneda(prefab, x, SueloY + 3.7f, ++indice);
         }
+
+        // una en el aire, entre las dos plataformas bajas
+        ColocarMoneda(prefab, -3.2f, SueloY + 1.8f, ++indice);
     }
 
     static void ColocarMoneda(GameObject prefab, float x, float y, int indice)
@@ -243,32 +277,9 @@ public static class ArmadorPlaza
         var moneda = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
         moneda.transform.position = new Vector3(x, y, 0f);
         moneda.name = "Moneda " + indice;
-    }
 
-    static void AjustarMeta()
-    {
-        foreach (PuntosPlaza puntaje in Object.FindObjectsByType<PuntosPlaza>(FindObjectsInactive.Exclude))
-        {
-            puntaje.puntosMeta = PuntosMeta;
-        }
-    }
-
-    static void CrearMusica()
-    {
-        var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(RutaMusicaHuayno);
-        if (clip == null)
-        {
-            Debug.Log("todavia no hay musica del huayno, cuando exista el wav la agrego aca");
-            return;
-        }
-
-        if (GameObject.Find("MusicaPlaza") != null) return;
-
-        var musica = new GameObject("MusicaPlaza");
-        var fuente = musica.AddComponent<AudioSource>();
-        fuente.clip = clip;
-        fuente.loop = true;
-        musica.AddComponent<MusicaPlaza>();
+        var render = moneda.GetComponent<SpriteRenderer>();
+        if (render != null) render.sortingOrder = 60;
     }
 
     static GameObject CargarOCrearPrefabMoneda()
@@ -342,6 +353,44 @@ public static class ArmadorPlaza
         rect.sizeDelta = new Vector2(800f, 60f);
 
         textoGO.AddComponent<PuntosPlaza>();
+    }
+
+    static void AjustarMeta()
+    {
+        foreach (PuntosPlaza puntaje in Object.FindObjectsByType<PuntosPlaza>(FindObjectsInactive.Exclude))
+        {
+            puntaje.puntosMeta = PuntosMeta;
+        }
+    }
+
+    static void CrearMusica()
+    {
+        var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(RutaMusicaHuayno);
+        if (clip == null)
+        {
+            Debug.Log("todavia no hay musica del huayno, cuando exista el wav la agrego aca");
+            return;
+        }
+
+        if (GameObject.Find("MusicaPlaza") != null) return;
+
+        var musica = new GameObject("MusicaPlaza");
+        var fuente = musica.AddComponent<AudioSource>();
+        fuente.clip = clip;
+        fuente.loop = true;
+        musica.AddComponent<MusicaPlaza>();
+    }
+
+    static void DesarmarCholita()
+    {
+        GameObject cholita = GameObject.Find("Cholita Paceña");
+        if (cholita == null) return;
+
+        Quitar<MovimientoPlaza>(cholita);
+        Quitar<BoxCollider2D>(cholita);
+        Quitar<Rigidbody2D>(cholita);
+        Transform pies = cholita.transform.Find("Pies");
+        if (pies != null) Object.DestroyImmediate(pies.gameObject);
     }
 
     static void AsegurarCapaPiso()
