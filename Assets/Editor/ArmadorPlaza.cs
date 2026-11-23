@@ -17,6 +17,7 @@ public static class ArmadorPlaza
     const string RutaSpriteCubito = "Assets/ArteBoliviano/cubito_gorrito.png";
     const string RutaSpritePlataforma = "Assets/ArteBoliviano/plataforma_madera.png";
     const string RutaFondo = "Assets/ArteBoliviano/fondo_plaza.png";
+    const string RutaFondoLateral = "Assets/ArteBoliviano/fondo_plaza_lateral.png";
 
     // el nivel son tres pantallas pegadas una al lado de la otra
     const float AnchoSegmento = 19.2f;
@@ -27,7 +28,7 @@ public static class ArmadorPlaza
     const float SueloY = -3.28f;
 
     const float AlturaDelCubito = 2f;
-    const float EscalaDelCubito = 0.9f;
+    const float EscalaDelCubito = 0.45f;
     const float EscalaDeVecino = 0.262f;
 
     const int PuntosMeta = 240;
@@ -200,8 +201,13 @@ public static class ArmadorPlaza
             if (render != null) render.sprite = sprite;
         }
 
-        CrearFondoLateral("Fondo izquierdo", -AnchoSegmento, sprite, true);
-        CrearFondoLateral("Fondo derecho", AnchoSegmento, sprite, true);
+        // los laterales usan la plaza sin sol ni montaña, asi queda uno solo en el centro
+        var lateral = AssetDatabase.LoadAssetAtPath<Sprite>(RutaFondoLateral);
+        if (lateral != null)
+        {
+            CrearFondoLateral("Fondo izquierdo", -AnchoSegmento, lateral, true);
+            CrearFondoLateral("Fondo derecho", AnchoSegmento, lateral, true);
+        }
     }
 
     static void CrearFondoLateral(string nombre, float x, Sprite sprite, bool espejado)
@@ -299,9 +305,9 @@ public static class ArmadorPlaza
         {
             float centro = (i - 1) * AnchoSegmento;
 
-            // en el piso
-            ColocarMoneda(prefab, centro + 3.3f, SueloY + 0.9f, ++indice);
-            ColocarMoneda(prefab, centro + 6.5f, SueloY + 0.9f, ++indice);
+            // en el piso, a la altura del cubito
+            ColocarMoneda(prefab, centro + 3.3f, SueloY + 0.6f, ++indice);
+            ColocarMoneda(prefab, centro + 6.5f, SueloY + 0.6f, ++indice);
 
             // sobre la plataforma baja
             foreach (float x in new float[] { centro - 7.8f, centro - 7f, centro - 6.2f })
