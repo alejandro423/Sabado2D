@@ -110,3 +110,5 @@ InitTestScene*.unity*
 
 # config de la herramienta aura, no va al repo
 /.Aura/
+# Local AI runtime state
+.atl/
