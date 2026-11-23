@@ -11,19 +11,19 @@ PALETA = {
     "marron": (139, 94, 60),
     "marron_claro": (172, 121, 78),
     "marron_oscuro": (106, 68, 40),
-    "rojo": (240, 59, 48),
-    "naranja": (255, 140, 26),
-    "amarillo": (255, 210, 63),
-    "verde": (31, 163, 107),
-    "azul": (30, 155, 215),
-    "morado": (122, 77, 191),
-    "blanco": (245, 239, 230),
+    "rojo": (198, 42, 38),
+    "naranja": (233, 126, 38),
+    "amarillo": (244, 197, 66),
+    "verde": (52, 140, 74),
+    "celeste": (63, 158, 212),
+    "violeta": (108, 70, 158),
+    "blanco": (242, 236, 222),
     "negro": (43, 26, 12),
     "mejilla": (217, 138, 106),
 }
 
-# colores del aguayo, de arriba hacia abajo
-RAYAS = ["rojo", "naranja", "amarillo", "verde", "azul", "morado"]
+# colores del wipala, en orden
+WIPALA = ["rojo", "naranja", "amarillo", "blanco", "verde", "celeste", "violeta"]
 
 
 def con_canal(rgb):
@@ -58,19 +58,27 @@ def circulo(img, cx, cy, radio, color):
                 punto(img, x, y, color)
 
 
+def wipala(img, x0, y0, x1, y1, celda=7):
+    # cuadros en diagonal, como el wipala
+    for y in range(y0, y1 + 1):
+        for x in range(x0, x1 + 1):
+            indice = (x // celda + y // celda) % len(WIPALA)
+            punto(img, x, y, WIPALA[indice])
+
+
 def gorrito(img):
     # pompom arriba
     circulo(img, 80, 16, 12, "amarillo")
 
-    # capucha con rayas de aguayo, arrriba angosta abajo ancha
-    y0, y1 = 30, 84
+    # capucha con el wipala, arriba angosta abajo ancha
+    y0, y1 = 28, 84
     for y in range(y0, y1):
         progreso = (y - y0) / (y1 - y0)
         medio = 80
-        ancho = 46 + int(progreso * 20)
-        franja = RAYAS[(y - y0) // 9 % len(RAYAS)]
+        ancho = 48 + int(progreso * 18)
         for x in range(medio - ancho, medio + ancho + 1):
-            punto(img, x, y, franja)
+            indice = (x // 7 + y // 7) % len(WIPALA)
+            punto(img, x, y, WIPALA[indice])
 
         # contorno del gorrito
         punto(img, medio - ancho, y, "contorno")
@@ -78,10 +86,11 @@ def gorrito(img):
         punto(img, medio + ancho, y, "contorno")
         punto(img, medio + ancho + 1, y, "contorno")
 
-    # vuelta del gorro
-    rectangulo(img, 14, 82, 146, 94, "marron_oscuro")
-    rectangulo(img, 14, 82, 146, 84, "contorno")
-    rectangulo(img, 14, 92, 146, 94, "contorno")
+    # vuelta del gorro, rojo con una linea blanca
+    rectangulo(img, 12, 82, 148, 96, "rojo")
+    rectangulo(img, 12, 82, 148, 84, "blanco")
+    rectangulo(img, 12, 82, 148, 82, "contorno")
+    rectangulo(img, 12, 96, 148, 96, "contorno")
 
 
 def cubito(img):
@@ -94,28 +103,33 @@ def cubito(img):
     # toque de luz arriba
     rectangulo(img, 22, 104, 138, 110, "marron_claro")
 
+    # poncho wipala cruzando el cuerpo
+    wipala(img, 13, 152, 147, 174)
+    rectangulo(img, 13, 152, 147, 152, "contorno")
+    rectangulo(img, 13, 174, 147, 174, "contorno")
+
     # sombra abajo
     rectangulo(img, 22, 184, 138, 190, "marron_oscuro")
 
 
 def cara(img):
     # ojos con brillo
-    for ex in (48, 98):
-        rectangulo(img, ex, 126, ex + 13, 143, "negro")
-        rectangulo(img, ex + 8, 129, ex + 11, 132, "blanco")
+    for ex in (46, 96):
+        rectangulo(img, ex, 112, ex + 13, 129, "negro")
+        rectangulo(img, ex + 8, 115, ex + 11, 118, "blanco")
 
     # mejillas
-    rectangulo(img, 30, 146, 43, 153, "mejilla")
-    rectangulo(img, 116, 146, 129, 153, "mejilla")
+    rectangulo(img, 28, 132, 41, 139, "mejilla")
+    rectangulo(img, 114, 132, 127, 139, "mejilla")
 
     # sonrisa
-    rectangulo(img, 70, 156, 89, 159, "negro")
-    punto(img, 66, 155, "negro")
-    punto(img, 67, 155, "negro")
-    punto(img, 67, 154, "negro")
-    punto(img, 93, 155, "negro")
-    punto(img, 92, 155, "negro")
-    punto(img, 92, 154, "negro")
+    rectangulo(img, 68, 142, 87, 145, "negro")
+    punto(img, 64, 141, "negro")
+    punto(img, 65, 141, "negro")
+    punto(img, 65, 140, "negro")
+    punto(img, 91, 141, "negro")
+    punto(img, 90, 141, "negro")
+    punto(img, 90, 140, "negro")
 
 
 def main():
