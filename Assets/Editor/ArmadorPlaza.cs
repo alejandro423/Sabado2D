@@ -31,13 +31,16 @@ public static class ArmadorPlaza
         AsegurarCapaPiso();
         int capaPiso = LayerMask.NameToLayer(NombreCapaPiso);
 
+        // la cholita es la referencia fija del suelo de la plaza
+        float suelo = LineaDeSuelo(cholita);
+
         // la cholita queda como parte del decorado, el jugador es el cubito
         DesarmarCholita();
-        float alturaPies = PrepararCubito(capaPiso);
-        CrearPiso(alturaPies, capaPiso);
-        CrearBordes(alturaPies, capaPiso);
-        CrearCajas(alturaPies, capaPiso);
-        ColocarMonedas(alturaPies);
+        PrepararCubito(capaPiso, suelo);
+        CrearPiso(suelo, capaPiso);
+        CrearBordes(suelo, capaPiso);
+        CrearCajas(suelo, capaPiso);
+        ColocarMonedas(suelo);
         CrearPuntaje();
         AjustarMeta();
         CrearMusica();
@@ -69,7 +72,7 @@ public static class ArmadorPlaza
         Debug.Log("plaza limpia");
     }
 
-    static float PrepararCubito(int capaPiso)
+    static void PrepararCubito(int capaPiso, float suelo)
     {
         GameObject cubito = GameObject.Find("Cubito");
 
@@ -78,17 +81,17 @@ public static class ArmadorPlaza
             cubito = new GameObject("Cubito");
             var sprite = cubito.AddComponent<SpriteRenderer>();
             sprite.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RutaSpriteCubito);
-            sprite.sortingOrder = 5;
-            cubito.transform.position = new Vector3(-3f, LineaDeSuelo() + AlturaDelCubito / 2f, 0f);
+            cubito.transform.position = new Vector3(-3f, 0f, 0f);
         }
 
         SpriteRenderer render = cubito.GetComponent<SpriteRenderer>();
+        render.sortingOrder = 50;
 
-        // que se vea bien, y parado justo sobre el piso
+        // que se vea bien, parado justo sobre el suelo
         cubito.transform.localScale = Vector3.one * EscalaDelCubito;
         cubito.transform.position = new Vector3(
             cubito.transform.position.x,
-            LineaDeSuelo() + AlturaDelCubito * EscalaDelCubito / 2f,
+            suelo + AlturaDelCubito * EscalaDelCubito / 2f,
             0f);
 
         var datos = render.sprite;
@@ -121,17 +124,13 @@ public static class ArmadorPlaza
         }
         pies.localPosition = new Vector3(caja.offset.x, caja.offset.y - caja.size.y / 2f, 0f);
         movimiento.pies = pies;
-
-        return cubito.transform.position.y - caja.offset.y + caja.size.y / 2f - caja.size.y;
     }
 
-    static float LineaDeSuelo()
+    static float LineaDeSuelo(GameObject cholita)
     {
-        GameObject piso = GameObject.Find("Piso de la plaza");
-        if (piso != null) return piso.transform.position.y + 0.25f;
-
-        GameObject cholita = GameObject.Find("Cholita Paceña");
-        if (cholita != null) return cholita.GetComponent<SpriteRenderer>().bounds.min.y;
+        // los pies de la cholita son la referencia fija del suelo de la plaza
+        var sprite = cholita.GetComponent<SpriteRenderer>();
+        if (sprite != null) return sprite.bounds.min.y;
 
         return 0f;
     }
@@ -148,7 +147,7 @@ public static class ArmadorPlaza
         if (pies != null) Object.DestroyImmediate(pies.gameObject);
     }
 
-    static void CrearPiso(float alturaPies, int capaPiso)
+    static void CrearPiso(float suelo, int capaPiso)
     {
         GameObject piso = GameObject.Find("Piso de la plaza");
         if (piso == null) piso = new GameObject("Piso de la plaza");
@@ -157,16 +156,16 @@ public static class ArmadorPlaza
         var caja = piso.GetComponent<BoxCollider2D>();
         if (caja == null) caja = piso.AddComponent<BoxCollider2D>();
         caja.size = new Vector2(40f, 0.5f);
-        piso.transform.position = new Vector3(0f, alturaPies - 0.25f, 0f);
+        piso.transform.position = new Vector3(0f, suelo - 0.25f, 0f);
     }
 
-    static void CrearBordes(float alturaPies, int capaPiso)
+    static void CrearBordes(float suelo, int capaPiso)
     {
-        CrearBorde("Borde izquierdo", -20.25f, alturaPies, capaPiso);
-        CrearBorde("Borde derecho", 20.25f, alturaPies, capaPiso);
+        CrearBorde("Borde izquierdo", -20.25f, suelo, capaPiso);
+        CrearBorde("Borde derecho", 20.25f, suelo, capaPiso);
     }
 
-    static void CrearBorde(string nombre, float x, float alturaPies, int capaPiso)
+    static void CrearBorde(string nombre, float x, float suelo, int capaPiso)
     {
         GameObject borde = GameObject.Find(nombre);
         if (borde == null) borde = new GameObject(nombre);
@@ -175,10 +174,10 @@ public static class ArmadorPlaza
         var caja = borde.GetComponent<BoxCollider2D>();
         if (caja == null) caja = borde.AddComponent<BoxCollider2D>();
         caja.size = new Vector2(0.5f, 10f);
-        borde.transform.position = new Vector3(x, alturaPies + 5f, 0f);
+        borde.transform.position = new Vector3(x, suelo + 5f, 0f);
     }
 
-    static void CrearCajas(float alturaPies, int capaPiso)
+    static void CrearCajas(float suelo, int capaPiso)
     {
         GameObject padre = GameObject.Find("Cajas de la plaza");
         if (padre == null) padre = new GameObject("Cajas de la plaza");
@@ -204,11 +203,11 @@ public static class ArmadorPlaza
 
             caja.layer = capaPiso;
             caja.transform.localScale = Vector3.one * 2f;
-            caja.transform.position = new Vector3(posiciones[i], alturaPies + 1f, 0f);
+            caja.transform.position = new Vector3(posiciones[i], suelo + 1f, 0f);
         }
     }
 
-    static void ColocarMonedas(float alturaPies)
+    static void ColocarMonedas(float suelo)
     {
         foreach (MonedaPlaza moneda in Object.FindObjectsByType<MonedaPlaza>(FindObjectsInactive.Exclude))
         {
@@ -222,19 +221,19 @@ public static class ArmadorPlaza
         // fila baja, en los huecos entre las cajas
         foreach (float x in new float[] { -5.25f, -1.75f, 1.75f, 5.25f })
         {
-            ColocarMoneda(prefab, x, alturaPies + 0.9f, ++indice);
+            ColocarMoneda(prefab, x, suelo + 0.9f, ++indice);
         }
 
         // fila sobre las cajas
         foreach (float x in new float[] { -7f, -3.5f, 0f, 3.5f, 7f })
         {
-            ColocarMoneda(prefab, x, alturaPies + 2.7f, ++indice);
+            ColocarMoneda(prefab, x, suelo + 2.7f, ++indice);
         }
 
         // fila alta, se llega saltando desde las cajas
         for (int i = 0; i < 7; i++)
         {
-            ColocarMoneda(prefab, -6f + i * 2f, alturaPies + 4.5f, ++indice);
+            ColocarMoneda(prefab, -6f + i * 2f, suelo + 4.5f, ++indice);
         }
     }
 
