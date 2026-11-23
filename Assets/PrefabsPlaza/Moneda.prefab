@@ -154,3 +154,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MonedaPlaza
   valor: 10
   velocidadGiro: 90
+  sonido: {fileID: 8300000, guid: b939ec4954c2b81c0a00cfbf897402ea, type: 3}
