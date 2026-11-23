@@ -1,10 +1,11 @@
 using UnityEngine;
 
-// moneda de la plaza, al tocarla suma puntos y desaparece
+// moneda de la plaza, al tocarla suma puntos, suena y desaparece
 public class MonedaPlaza : MonoBehaviour
 {
     public int valor = 10;
     public float velocidadGiro = 90f;
+    public AudioClip sonido;
 
     void Update()
     {
@@ -13,6 +14,11 @@ public class MonedaPlaza : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D otro)
     {
+        if (sonido != null)
+        {
+            AudioSource.PlayClipAtPoint(sonido, transform.position);
+        }
+
         if (PuntosPlaza.Instancia == null) return;
         PuntosPlaza.Instancia.Sumar(valor);
         Destroy(gameObject);
