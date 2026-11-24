@@ -8728,6 +8728,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1929727735}
+  - component: {fileID: 1929727736}
   m_Layer: 0
   m_Name: CentroMeta
   m_TagString: Untagged
@@ -8750,6 +8751,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2014321922}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1929727736
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1929727734}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a4bcb26293cc3341a440ceee2da9236, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MetaVictoria
+  auto: {fileID: 2145000002}
+  margen: 0.05
+  tamanoTrigger: {x: 8, y: 1}
 --- !u!1 &1944023299
 GameObject:
   m_ObjectHideFlags: 0
